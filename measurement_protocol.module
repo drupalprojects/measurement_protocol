@@ -4,11 +4,18 @@
  */
 
 /**
- * undocumented function
+ * Create a payload that will go to Google's collection service.
+ * 
+ * Ideally, you wouldn't use this function, but you'd use one of the many
+ * helper functions that are better suited to their individual tasks.
  *
- * @param string $data 
- * @return void
- * @author Nicholas Vahalik
+ * @param array $data
+ * @see mptph()
+ * @see mpte()
+ * @see mptec()
+ * @see mpts()
+ * @see mptex()
+ * @return array
  */
 function measurement_protocol_create_create_payload($data) {
 
@@ -29,7 +36,7 @@ function measurement_protocol_create_create_payload($data) {
   $payload['cid'] = measurement_protocol_get_cookie();
 
   foreach ($map as $data_key => $payload_key) {
-    if (isset($data[$data_key])) {
+    if (isset($data[$data_key]) && $data[$data_key] != '') {
       $payload[$payload_key] = $data[$data_key];
     }
   }
@@ -37,26 +44,66 @@ function measurement_protocol_create_create_payload($data) {
   return $payload;
 }
 
+/**
+ * Sends an action to Google's collection service.  Returns the response
+ * that drupal_http_request() returns.
+ *
+ * @param array $data 
+ * @return object
+ */
 function measurement_protocol_send_action($data) {
   if ($data !== NULL) {
     // We pass the '&' because on some servers it defaults to '&amp;';
-    $reqeust_data = http_build_query($data, '', '&');
-    watchdog('measurement', print_r($reqeust_data, TRUE), array(), WATCHDOG_DEBUG);
-    $retval =  drupal_http_request('https://ssl.google-analytics.com/collect', array('method' => 'POST', 'data' => $reqeust_data));
+    $request_data = http_build_query($data, '', '&');
+    $retval =  drupal_http_request('https://ssl.google-analytics.com/collect', array('method' => 'POST', 'data' => $request_data));
     return $retval;
   }
 }
 
+/**
+ * Takes data as it's parameter.  Builds a GA payload and then sends the
+ * data to the collection service.  While you could use this directly, it is
+ * recommended to use Helper functions.
+ *
+ * @param array $data
+ * @author Nicholas Vahalik
+ */
 function mpt($data) {
   $data = measurement_protocol_create_create_payload($data);
-  measurement_protocol_send_action($data);
+  $response = measurement_protocol_send_action($data);
+  if (is_object($response) && $response->status !== 200) {
+    watchdog('measurement', 'Error (%code): %message' . PHP_EOL . 'Error: %error' . PHP_EOL . 'Request Payload: %req', array(
+      '%code' => $response->status,
+      '%message' => $response->status_message,
+      '%error' => $response->error,
+      '%req' => $response->request
+      ), WATCHDOG_ERROR);
+  }
 }
 
+/**
+ * Track a page hit with Google Analytics.
+ *
+ * @param array $data 
+ *   (required) An array describes the page hit:
+ *   - title: The title of the page.
+ *   - referrer: The referring URL.
+ *   - page: Path to the page tracked.
+ */
 function mptph($data) {
   $data['t'] = 'pageview';
   mpt($data);
 }
 
+/**
+ * Track an event with Google Analytics.
+ *
+ * @param string $category The event category.
+ * @param string $action The event action.
+ * @param string $label The event label.
+ * @param int $value (optional) The event value.
+ * @param array $data (optional) Extra data to send with the event.
+ */
 function mpte($category, $action, $label = NULL, $value = NULL, $data = array()) {
   $data['t'] = 'event';
   $data['ec'] = $category;
@@ -70,15 +117,27 @@ function mpte($category, $action, $label = NULL, $value = NULL, $data = array())
   mpt($data);
 }
 
+/**
+ * Grabs the cookie from the existing session if it is available.  If it is
+ * not available, then we generate one or pass the anonymous CID.
+ *
+ * @return string
+ */
 function measurement_protocol_get_cookie() {
   if (isset($_COOKIE['_ga'])) {
     return $cid1 . '.' . $cid2;
   }
   else {
-    return 555; // measurement_protocol_gen_uuid();
+    return (variable_get('measurement_protocol_uuid_anon', 'anon') == 'anon' ? 555 : measurement_protocol_gen_uuid());
   }
 }
 
+/**
+ * Generates a UUID.
+ *
+ * @return string
+ * @see http://www.php.net/manual/en/function.uniqid.php#94959
+ */
 function measurement_protocol_gen_uuid() {
     return sprintf( '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
         // 32 bits for "time_low"
