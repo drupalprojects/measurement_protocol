@@ -1,0 +1,6 @@
+name = Measurement Protocol
+description = Extends Google Analytics to implement Google's Measurement Protocol for handling server-side event tracking.
+core = 7.x
+package = Statistics
+
+requirements[] = googleanalytics
