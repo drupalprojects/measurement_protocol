@@ -1,5 +1,6 @@
 <?php
 /**
+ * @file
  * Google Measurement Protocol module.
  */
 
@@ -10,12 +11,15 @@
  * helper functions that are better suited to their individual tasks.
  *
  * @param array $data
+ *   An array containing one or more data keys. See the below functions for
+ *   more information on how to use.
+ *
  * @see mptph()
  * @see mpte()
- * @see mptec()
- * @see mpts()
- * @see mptex()
+ *
  * @return array
+ *   The prepared payload, ready to be sent to Google. If null is returned,
+ *   then the account was not set.
  */
 function measurement_protocol_create_create_payload($data) {
 
@@ -27,9 +31,15 @@ function measurement_protocol_create_create_payload($data) {
   }
 
   $map = array(
-    'title' => 'dt', 'page' => 'dp', 'referrer' => 'dr',
-    'type' => 't',   't' => 't',     'ec' => 'ec',
-    'ea' => 'ea',    'el' => 'el',   'ev' => 'ev',
+    'title' => 'dt',
+    'page' => 'dp',
+    'referrer' => 'dr',
+    'type' => 't',
+    't' => 't',
+    'ec' => 'ec',
+    'ea' => 'ea',
+    'el' => 'el',
+    'ev' => 'ev',
   );
 
   $payload['v'] = 1;
@@ -45,39 +55,45 @@ function measurement_protocol_create_create_payload($data) {
 }
 
 /**
- * Sends an action to Google's collection service.  Returns the response
- * that drupal_http_request() returns.
+ * Sends an action to Google's collection service.
+ *
+ * Returns the response that drupal_http_request() returns.
  *
  * @param array $data
+ *   A data array containing a prepared payload.
+ *
  * @return object
+ *   The response from drupal_http_request().
  */
 function measurement_protocol_send_action($data) {
   if ($data !== NULL) {
-    // We pass the '&' because on some servers it defaults to '&amp;';
+    // We pass the '&' because on some servers it defaults to '&amp;'.
     $request_data = http_build_query($data, '', '&');
-    $retval =  drupal_http_request('https://ssl.google-analytics.com/collect', array('method' => 'POST', 'data' => $request_data));
+    $retval = drupal_http_request('https://ssl.google-analytics.com/collect', array('method' => 'POST', 'data' => $request_data));
     return $retval;
   }
 }
 
 /**
- * Takes data as it's parameter.  Builds a GA payload and then sends the
- * data to the collection service.  While you could use this directly, it is
+ * Build and send an MP payload.
+ *
+ * Takes data as it's parameter. Builds a GA payload and then sends the
+ * data to the collection service. While you could use this directly, it is
  * recommended to use Helper functions.
  *
  * @param array $data
- * @author Nicholas Vahalik
+ *    An array containing keys with one or more data points to send to Google.
  */
 function mpt($data) {
   $data = measurement_protocol_create_create_payload($data);
   $response = measurement_protocol_send_action($data);
   if (is_object($response) && $response->code !== 200) {
-    watchdog('measurement', 'Error (%code): %message' . PHP_EOL . 'Error: %error' . PHP_EOL . 'Request Payload: %req', array(
+    watchdog('measurement', 'Error (%code): %message<br/>Error: %error<br/>Request Payload: %req', array(
       '%code' => $response->code,
       '%message' => $response->status_message,
       '%error' => $response->error,
-      '%req' => $response->request
-      ), WATCHDOG_ERROR);
+      '%req' => $response->request,
+    ), WATCHDOG_ERROR);
   }
 }
 
@@ -98,11 +114,16 @@ function mptph($data) {
 /**
  * Track an event with Google Analytics.
  *
- * @param string $category The event category.
- * @param string $action The event action.
- * @param string $label The event label.
- * @param int $value (optional) The event value.
- * @param array $data (optional) Extra data to send with the event.
+ * @param string $category
+ *   The event category.
+ * @param string $action
+ *   The event action.
+ * @param string $label
+ *   The event label.
+ * @param int $value
+ *   (optional) The event value.
+ * @param array $data
+ *   (optional) Extra data to send with the event.
  */
 function mpte($category, $action, $label = NULL, $value = NULL, $data = array()) {
   $data['t'] = 'event';
@@ -118,10 +139,14 @@ function mpte($category, $action, $label = NULL, $value = NULL, $data = array())
 }
 
 /**
- * Grabs the cookie from the existing session if it is available.  If it is
- * not available, then we generate one or pass the anonymous CID.
+ * Grabs the cookie from the existing session if it is available.
+ *
+ * If it is not available, then we generate one or pass the anonymous CID.
+ * This is currently the only supported method.
  *
  * @return string
+ *   Returns some sort of cookie value. I'm not sure where these values come
+ *   from honestly. Maybe the googleanalytics module...
  */
 function measurement_protocol_get_cookie() {
   if (isset($_COOKIE['_ga'])) {
@@ -136,26 +161,24 @@ function measurement_protocol_get_cookie() {
  * Generates a UUID.
  *
  * @return string
+ *   A string containing a UUID.
+ *
  * @see http://www.php.net/manual/en/function.uniqid.php#94959
  */
 function measurement_protocol_gen_uuid() {
-    return sprintf( '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
-        // 32 bits for "time_low"
-        mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ),
-
-        // 16 bits for "time_mid"
-        mt_rand( 0, 0xffff ),
-
-        // 16 bits for "time_hi_and_version",
-        // four most significant bits holds version number 4
-        mt_rand( 0, 0x0fff ) | 0x4000,
-
-        // 16 bits, 8 bits for "clk_seq_hi_res",
-        // 8 bits for "clk_seq_low",
-        // two most significant bits holds zero and one for variant DCE1.1
-        mt_rand( 0, 0x3fff ) | 0x8000,
-
-        // 48 bits for "node"
-        mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff )
-    );
+  return sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+    // 32 bits for "time_low".
+    mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+    // 16 bits for "time_mid".
+    mt_rand(0, 0xffff),
+    // 16 bits for "time_hi_and_version".
+    // four most significant bits holds version number 4.
+    mt_rand(0, 0x0fff) | 0x4000,
+    // 16 bits, 8 bits for "clk_seq_hi_res".
+    // 8 bits for "clk_seq_low".
+    // two most significant bits holds zero and one for variant DCE1.1.
+    mt_rand(0, 0x3fff) | 0x8000,
+    // 48 bits for "node".
+    mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+  );
 }
