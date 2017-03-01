@@ -5,7 +5,7 @@
 
 /**
  * Create a payload that will go to Google's collection service.
- * 
+ *
  * Ideally, you wouldn't use this function, but you'd use one of the many
  * helper functions that are better suited to their individual tasks.
  *
@@ -48,7 +48,7 @@ function measurement_protocol_create_create_payload($data) {
  * Sends an action to Google's collection service.  Returns the response
  * that drupal_http_request() returns.
  *
- * @param array $data 
+ * @param array $data
  * @return object
  */
 function measurement_protocol_send_action($data) {
@@ -71,9 +71,9 @@ function measurement_protocol_send_action($data) {
 function mpt($data) {
   $data = measurement_protocol_create_create_payload($data);
   $response = measurement_protocol_send_action($data);
-  if (is_object($response) && $response->status !== 200) {
+  if (is_object($response) && $response->code !== 200) {
     watchdog('measurement', 'Error (%code): %message' . PHP_EOL . 'Error: %error' . PHP_EOL . 'Request Payload: %req', array(
-      '%code' => $response->status,
+      '%code' => $response->code,
       '%message' => $response->status_message,
       '%error' => $response->error,
       '%req' => $response->request
@@ -84,7 +84,7 @@ function mpt($data) {
 /**
  * Track a page hit with Google Analytics.
  *
- * @param array $data 
+ * @param array $data
  *   (required) An array describes the page hit:
  *   - title: The title of the page.
  *   - referrer: The referring URL.
